@@ -6,20 +6,19 @@ export const getAuthHeader = (): HeadersInit => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-export const getHeaders = (includeAuth = true): HeadersInit => {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-  
-  if (includeAuth) {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+export const getHeaders = (auth = false, isForm = false) => {
+  const headers: Record<string, string> = {};
+
+  if (!isForm) headers["Content-Type"] = "application/json";
+
+  if (auth) {
+    const token = localStorage.getItem("access_token");
+    if (token) headers["Authorization"] = `Bearer ${token}`;
   }
-  
+
   return headers;
 };
+
 
 export const handleResponse = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {

@@ -1,5 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { User, login as apiLogin, register as apiRegister, getMe, LoginData, RegisterData } from '@/lib/api/auth';
+import { 
+  User, 
+  login as apiLogin, 
+  register as apiRegister, 
+  getMe, 
+  LoginData, 
+  RegisterData,
+  deleteAccount as apiDeleteAccount
+} from '@/lib/api/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -7,6 +15,7 @@ interface AuthContextType {
   login: (data: LoginData) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
+  deleteAccount: () => Promise<void>;   
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,14 +64,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const tokens = await apiLogin(data);
     localStorage.setItem('access_token', tokens.access);
     localStorage.setItem('refresh_token', tokens.refresh);
-    
+
     const userData = await getMe();
     setUser(userData);
   };
 
   const register = async (data: RegisterData) => {
     await apiRegister(data);
-    // Auto-login after registration
     await login({ username: data.username, password: data.password });
   };
 
@@ -70,8 +78,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearAuth();
   };
 
+  //DELETE ACCOUNT FUNCTION
+  const deleteAccount = async () => {
+    try {
+      await apiDeleteAccount();
+    } catch (e) {
+      console.error("Delete account failed:", e);
+    } finally {
+      clearAuth();
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider 
+      value={{ 
+        user, 
+        loading, 
+        login, 
+        register, 
+        logout, 
+        deleteAccount    
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

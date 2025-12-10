@@ -65,3 +65,15 @@ export const getMe = async (): Promise<User> => {
   
   return handleResponse<User>(response);
 };
+
+export const deleteAccount = async (): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/delete/`, {
+    method: "DELETE",
+    headers: getHeaders(true),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || errorData.message || "Failed to delete account");
+  }
+};

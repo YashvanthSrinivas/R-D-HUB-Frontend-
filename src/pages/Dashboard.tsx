@@ -6,12 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   Search, Users, MessageSquare, Bot, LogOut, Sparkles, 
-  AlertTriangle, User, Mail, ChevronRight 
+  AlertTriangle, User, Mail, ChevronRight, Trash2
 } from 'lucide-react';
 import { getResearchers, ResearcherProfile } from '@/lib/api/papers';
 
 const Dashboard = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, deleteAccount } = useAuth();   // ⬅ ADDED deleteAccount
   const navigate = useNavigate();
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,6 +37,22 @@ const Dashboard = () => {
   const handleLogout = () => {
     logout();
     navigate('/auth');
+  };
+
+  // ⭐ NEW — Delete Account Handler
+  const handleDeleteAccount = async () => {
+    const yes = confirm(
+      "Are you absolutely sure you want to delete your account? This cannot be undone."
+    );
+
+    if (!yes) return;
+
+    try {
+      await deleteAccount();
+      navigate('/'); // Redirect to landing page
+    } catch (err) {
+      alert("Failed to delete account. Try again.");
+    }
   };
 
   const quickLinks = [
@@ -79,6 +95,8 @@ const Dashboard = () => {
             <Sparkles className="h-6 w-6 text-primary" />
             <span className="text-lg font-bold font-heading">R&D Connect</span>
           </Link>
+
+          {/* Buttons Row */}
           <div className="flex items-center gap-4">
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/researchers" className="text-muted-foreground hover:text-foreground transition-colors">
@@ -94,6 +112,22 @@ const Dashboard = () => {
                 AI Assistant
               </Link>
             </nav>
+
+            {/* DELETE ACCOUNT BUTTON (RED + DANGEROUS) */}
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                if (confirm("Are you sure? This action cannot be undone.")) {
+                deleteAccount();
+                navigate('/auth');
+               }
+            }}
+            >
+              Delete Account
+           </Button>
+
+
+            {/* LOGOUT BUTTON */}
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
               Logout
@@ -107,7 +141,7 @@ const Dashboard = () => {
         {/* Welcome Section */}
         <div className="mb-8 animate-fade-in">
           <h1 className="text-3xl font-bold mb-2 font-heading">
-            Welcome back, {user?.username}!
+            Welcome, {user?.username}!
           </h1>
           <div className="flex items-center gap-4 text-muted-foreground">
             <span className="flex items-center gap-1">
@@ -130,8 +164,8 @@ const Dashboard = () => {
               You haven't created your researcher profile yet. Create one to be discoverable 
               by other users and receive collaboration requests.
               <Button asChild className="mt-4 block w-fit" size="sm">
-                <Link to="/create-profile">
-                  Create Profile <ChevronRight className="h-4 w-4 ml-1" />
+                <Link to="/create-profile" className="flex items-center justify-center">
+                  Create Profile 
                 </Link>
               </Button>
             </AlertDescription>
@@ -164,7 +198,7 @@ const Dashboard = () => {
           ))}
         </div>
 
-        {/* Stats or Additional Info */}
+        {/* Stats */}
         <div className="mt-12">
           <h2 className="text-xl font-bold mb-4 font-heading">Getting Started</h2>
           <Card className="border-0 shadow-md">
