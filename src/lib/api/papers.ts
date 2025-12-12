@@ -1,7 +1,8 @@
 import { API_BASE_URL, getHeaders, handleResponse } from "./config";
+import { refreshToken } from "@/lib/api/auth";
 
 /* =========================================================
-   AI ASSISTANT TYPES (MOVED TO TOP – IMPORTANT)
+   AI ASSISTANT TYPES
    ========================================================= */
 export interface AssistantTimeline {
   design: string;
@@ -90,9 +91,7 @@ export const getResearchers = async (): Promise<ResearcherProfile[]> => {
   return handleResponse(response);
 };
 
-export const getResearcherById = async (
-  id: number
-): Promise<ResearcherProfile> => {
+export const getResearcherById = async (id: number): Promise<ResearcherProfile> => {
   const response = await fetch(`${API_BASE_URL}/api/papers/researcher/${id}/`, {
     method: "GET",
     headers: getHeaders(false),
@@ -103,17 +102,15 @@ export const getResearcherById = async (
 export const createResearcherProfile = async (
   formData: FormData
 ): Promise<ResearcherProfile> => {
-  const token = localStorage.getItem("access_token");
+  const token = localStorage.getItem("access");
+
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
-  const response = await fetch(
-    `${API_BASE_URL}/api/papers/researcher/create/`,
-    {
-      method: "POST",
-      headers,
-      body: formData,
-    }
-  );
+  const response = await fetch(`${API_BASE_URL}/api/papers/researcher/create/`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
 
   return handleResponse(response);
 };
@@ -126,22 +123,19 @@ export const sendCollaborationRequest = async (
   toResearcher: number,
   message: string
 ) => {
-  const response = await fetch(
-    `${API_BASE_URL}/api/papers/collaboration/send/`,
-    {
-      method: "POST",
-      headers: getHeaders(true),
-      body: JSON.stringify({ to_researcher: toResearcher, message }),
-    }
-  );
+  const response = await fetch(`${API_BASE_URL}/api/papers/collaboration/send/`, {
+    method: "POST",
+    headers: getHeaders(true),
+    body: JSON.stringify({ to_researcher: toResearcher, message }),
+  });
   return handleResponse(response);
 };
 
 export const getSentRequests = async () => {
-  const response = await fetch(
-    `${API_BASE_URL}/api/papers/collaboration/sent/`,
-    { method: "GET", headers: getHeaders(true) }
-  );
+  const response = await fetch(`${API_BASE_URL}/api/papers/collaboration/sent/`, {
+    method: "GET",
+    headers: getHeaders(true),
+  });
   return handleResponse(response);
 };
 
@@ -174,10 +168,11 @@ export const updateCollaborationStatus = async (
 
 export const searchIEEE = async (query: string) => {
   const response = await fetch(
-    `${API_BASE_URL}/api/papers/search/ieee/?query=${encodeURIComponent(
-      query
-    )}`,
-    { method: "GET", headers: getHeaders(false) }
+    `${API_BASE_URL}/api/papers/search/ieee/?query=${encodeURIComponent(query)}`,
+    {
+      method: "GET",
+      headers: getHeaders(false),
+    }
   );
 
   const data = await handleResponse<IEEESearchResponse | IEEEPaper[]>(response);
@@ -185,18 +180,21 @@ export const searchIEEE = async (query: string) => {
 };
 
 /* =========================================================
-   AI ASSISTANT QUERY
+   AI ASSISTANT QUERY (FIXED ENDPOINT)
    ========================================================= */
 
-export const queryAssistant = async (query: string) => {
+export const queryAssistant = async (query: string): Promise<{ response: any }> => {
   const token = localStorage.getItem("access");
 
-  const response = await fetch(`${API_BASE_URL}/api/papers/assistant/query/`, {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  
+  const response = await fetch(`${API_BASE_URL}/api/assistant/query/`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: token ? `Bearer ${token}` : "",
-    },
+    headers,
     body: JSON.stringify({ query }),
   });
 
@@ -219,7 +217,7 @@ export const uploadResearchPaper = async (file: File) => {
   const response = await fetch(`${API_BASE_URL}/api/papers/upload/`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+      Authorization: `Bearer ${localStorage.getItem("access")}`,
     },
     body: fd,
   });
@@ -231,13 +229,10 @@ export const uploadResearchPaper = async (file: File) => {
 };
 
 export const deleteResearchPaper = async (paperId: number) => {
-  const response = await fetch(
-    `${API_BASE_URL}/api/papers/delete/${paperId}/`,
-    {
-      method: "DELETE",
-      headers: getHeaders(true),
-    }
-  );
+  const response = await fetch(`${API_BASE_URL}/api/papers/delete/${paperId}/`, {
+    method: "DELETE",
+    headers: getHeaders(true),
+  });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
@@ -245,25 +240,38 @@ export const deleteResearchPaper = async (paperId: number) => {
   }
 };
 
+
 /* =========================================================
-   PROFILE PHOTO UPLOAD / DELETE
+   PROFILE PHOTO UPLOAD (AUTO REFRESH TOKEN)
    ========================================================= */
 
 export async function uploadProfilePhoto(file: File) {
-  const token = localStorage.getItem("access_token");
+  let token = localStorage.getItem("access");
+  const refresh = localStorage.getItem("refresh");
+
+  // If access token missing/expired → refresh it
+  if (!token && refresh) {
+    try {
+      const newTokens = await refreshToken(refresh);
+      token = newTokens.access;
+      localStorage.setItem("access", token);
+    } catch (e) {
+      throw new Error("Session expired. Please login again.");
+    }
+  }
+
   if (!token) throw new Error("Not authenticated");
 
   const formData = new FormData();
   formData.append("photo", file);
 
-  const res = await fetch(
-    `${API_BASE_URL}/api/papers/researcher/photo/upload/`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-    }
-  );
+  const res = await fetch(`${API_BASE_URL}/api/papers/researcher/photo/upload/`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -274,16 +282,28 @@ export async function uploadProfilePhoto(file: File) {
 }
 
 export async function removeProfilePhoto() {
-  const token = localStorage.getItem("access_token");
+  let token = localStorage.getItem("access");
+  const refresh = localStorage.getItem("refresh");
+
+  // Auto refresh
+  if (!token && refresh) {
+    try {
+      const newTokens = await refreshToken(refresh);
+      token = newTokens.access;
+      localStorage.setItem("access", token);
+    } catch {
+      throw new Error("Session expired. Please login again.");
+    }
+  }
+
   if (!token) throw new Error("Not authenticated");
 
-  const res = await fetch(
-    `${API_BASE_URL}/api/papers/researcher/photo/remove/`,
-    {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    }
-  );
+  const res = await fetch(`${API_BASE_URL}/api/papers/researcher/photo/remove/`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

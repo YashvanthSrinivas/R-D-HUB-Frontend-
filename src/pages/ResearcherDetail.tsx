@@ -9,7 +9,6 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   ArrowLeft,
@@ -31,8 +30,8 @@ import {
   sendCollaborationRequest,
   uploadResearchPaper,
   deleteResearchPaper,
-  uploadProfilePhoto,    
-  removeProfilePhoto,     
+  uploadProfilePhoto,
+  removeProfilePhoto,
   ResearcherProfile,
 } from '@/lib/api/papers';
 
@@ -118,6 +117,7 @@ const ResearcherDetail = () => {
             </Link>
           </div>
         </header>
+
         <main className="container mx-auto px-4 py-8">
           <Card className="max-w-3xl mx-auto border-0 shadow-lg">
             <CardHeader>
@@ -167,11 +167,9 @@ const ResearcherDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
-
-      {/* HEADER */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
-          <Link to="/researchers" className="flex items-center gap-2 hover:text-primary transition-colors">
+          <Link to="/researchers" className="flex items-center gap-2 hover:text-primary">
             <ArrowLeft className="h-5 w-5" />
             <Sparkles className="h-6 w-6 text-primary" />
             <span className="text-lg font-bold font-heading">R&D Connect</span>
@@ -181,15 +179,12 @@ const ResearcherDetail = () => {
 
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-3xl mx-auto">
-
-          {/* PROFILE CARD */}
           <Card className="border-0 shadow-lg mb-8 animate-fade-in">
             <CardHeader className="pb-4">
               <div className="flex items-start gap-6">
 
-                {/* PROFILE PHOTO + BUTTONS */}
+                {/* PROFILE PHOTO */}
                 <div className="flex flex-col items-center">
-
                   {researcher.photo ? (
                     <img
                       src={researcher.photo}
@@ -202,20 +197,18 @@ const ResearcherDetail = () => {
                     </div>
                   )}
 
-                  {/* Owner buttons */}
                   {isOwnProfile && (
                     <div className="flex flex-col gap-2 mt-3">
-
-                      {/* Upload New Photo */}
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => document.getElementById("profilePhotoInput")?.click()}
+                        onClick={() =>
+                          document.getElementById("profilePhotoInput")?.click()
+                        }
                       >
                         <Upload className="h-4 w-4 mr-2" /> Change Photo
                       </Button>
 
-                      {/* Remove Photo */}
                       {researcher.photo && (
                         <Button
                           variant="destructive"
@@ -225,15 +218,12 @@ const ResearcherDetail = () => {
 
                             try {
                               await removeProfilePhoto();
-
                               toast({
                                 title: "Photo Removed",
                                 description: "Your profile photo was deleted.",
                               });
 
-                              setResearcher((prev) =>
-                                prev ? { ...prev, photo: null } : prev
-                              );
+                              await fetchResearcher();
                             } catch (err: any) {
                               toast({
                                 title: "Failed",
@@ -249,7 +239,6 @@ const ResearcherDetail = () => {
                     </div>
                   )}
 
-                  {/* Hidden Input */}
                   <input
                     id="profilePhotoInput"
                     type="file"
@@ -260,16 +249,14 @@ const ResearcherDetail = () => {
                       if (!file) return;
 
                       try {
-                        const updated = await uploadProfilePhoto(file);
+                        await uploadProfilePhoto(file);
 
                         toast({
                           title: "Updated",
                           description: "Profile photo updated!",
                         });
 
-                        setResearcher((prev) =>
-                          prev ? { ...prev, photo: updated.photo } : prev
-                        );
+                        await fetchResearcher();  // ← FIXED: reload updated photo
                       } catch (err: any) {
                         toast({
                           title: "Upload Failed",
@@ -305,18 +292,20 @@ const ResearcherDetail = () => {
               </div>
             </CardHeader>
 
-            {/* ABOUT + UPLOAD RESEARCH PAPERS */}
             <CardContent>
-
               <h3 className="font-semibold mb-2">About</h3>
-              <p className="text-muted-foreground whitespace-pre-wrap">{researcher.bio}</p>
+              <p className="text-muted-foreground whitespace-pre-wrap">
+                {researcher.bio}
+              </p>
 
               {isOwnProfile && (
                 <div className="mt-6 mb-4">
                   <Button
                     variant="outline"
                     className="flex items-center gap-2"
-                    onClick={() => document.getElementById("paperUploadInput")?.click()}
+                    onClick={() =>
+                      document.getElementById("paperUploadInput")?.click()
+                    }
                   >
                     <Upload className="h-4 w-4" />
                     Upload New Research Paper
@@ -352,7 +341,6 @@ const ResearcherDetail = () => {
                 </div>
               )}
 
-              {/* Paper List */}
               {hasPapersArray && (
                 <div className="mt-6">
                   <h3 className="font-semibold mb-2 flex items-center gap-2">
@@ -371,7 +359,8 @@ const ResearcherDetail = () => {
                           </span>
                           {paper.uploaded_at && (
                             <span className="text-xs text-muted-foreground">
-                              Uploaded: {new Date(paper.uploaded_at).toLocaleDateString()}
+                              Uploaded:{' '}
+                              {new Date(paper.uploaded_at).toLocaleDateString()}
                             </span>
                           )}
                         </div>
@@ -383,7 +372,7 @@ const ResearcherDetail = () => {
                             size="sm"
                             className="gap-2"
                           >
-                            <a href={paper.file} target="_blank" rel="noreferrer">
+                            <a href={paper.file} target="_blank">
                               <FileText className="h-4 w-4" />
                               View PDF
                             </a>
@@ -407,7 +396,12 @@ const ResearcherDetail = () => {
 
                                   setResearcher((prev) =>
                                     prev
-                                      ? { ...prev, papers: prev.papers!.filter((p) => p.id !== paper.id) }
+                                      ? {
+                                          ...prev,
+                                          papers: prev.papers!.filter(
+                                            (p) => p.id !== paper.id
+                                          ),
+                                        }
                                       : prev
                                   );
                                 } catch (err: any) {
@@ -428,11 +422,9 @@ const ResearcherDetail = () => {
                   </ul>
                 </div>
               )}
-
             </CardContent>
           </Card>
 
-          {/* COLLABORATION REQUEST */}
           {!isOwnProfile && (
             <Card className="border-0 shadow-lg animate-slide-up">
               <CardHeader>
@@ -448,7 +440,9 @@ const ResearcherDetail = () => {
                 {requestSent ? (
                   <div className="text-center py-6">
                     <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                    <p className="text-lg font-medium mb-2">Request Sent Successfully!</p>
+                    <p className="text-lg font-medium mb-2">
+                      Request Sent Successfully!
+                    </p>
                     <p className="text-muted-foreground mb-4">
                       {researcher.full_name} will review your request soon.
                     </p>
@@ -487,8 +481,8 @@ const ResearcherDetail = () => {
                         You need to{' '}
                         <Link to="/auth" className="text-primary hover:underline">
                           sign in
-                        </Link>
-                        {' '}to send a request.
+                        </Link>{' '}
+                        to send a request.
                       </p>
                     )}
                   </div>
@@ -496,7 +490,6 @@ const ResearcherDetail = () => {
               </CardContent>
             </Card>
           )}
-
         </div>
       </main>
     </div>

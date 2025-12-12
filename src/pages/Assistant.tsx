@@ -17,18 +17,33 @@ import {
   Loader2,
   Lightbulb,
 } from "lucide-react";
-import {
-  queryAssistant,
-  AssistantAnalysis,
-} from "@/lib/api/papers";
+
+import { queryAssistant } from "@/lib/api/papers";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+
+/* -----------------------------------------
+   SAFE DEFAULT STRUCTURE
+------------------------------------------ */
+const SAFE_DEFAULT = {
+  overview: "",
+  steps: [] as string[],
+  tools: [] as string[],
+  timeline: {
+    design: "",
+    implementation: "",
+    mvp: "",
+  },
+  competitors: [] as string[],
+  strategies: [] as string[],
+  summary: "",
+};
 
 const Assistant = () => {
   const { user } = useAuth();
 
   const [query, setQuery] = useState("");
-  const [analysis, setAnalysis] = useState<AssistantAnalysis | null>(null);
+  const [analysis, setAnalysis] = useState(SAFE_DEFAULT);
   const [loading, setLoading] = useState(false);
 
   const exampleQueries = [
@@ -38,6 +53,9 @@ const Assistant = () => {
     "Renewable energy storage solutions",
   ];
 
+  /* -----------------------------------------
+     HANDLE FORM SUBMIT
+  ------------------------------------------ */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -51,11 +69,33 @@ const Assistant = () => {
     }
 
     setLoading(true);
-    setAnalysis(null);
 
     try {
-      const data = await queryAssistant(query);
-      setAnalysis(data);
+      const result = await queryAssistant(query);
+
+      let payload: any = {};
+
+      try {
+        // Backend already sends JSON object
+        if (typeof result.response === "object") {
+          payload = result.response;
+        } else {
+          payload = JSON.parse(result.response || "{}");
+        }
+      } catch {
+        payload = {};
+      }
+
+      const safe = {
+        ...SAFE_DEFAULT,
+        ...payload,
+        timeline: {
+          ...SAFE_DEFAULT.timeline,
+          ...(payload.timeline || {}),
+        },
+      };
+
+      setAnalysis(safe);
     } catch (err: any) {
       toast({
         title: "Query Failed",
@@ -67,13 +107,11 @@ const Assistant = () => {
     }
   };
 
-  const handleExampleClick = (example: string) => {
-    setQuery(example);
-  };
+  const handleExampleClick = (example: string) => setQuery(example);
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* HEADER */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
           <Link
@@ -88,23 +126,19 @@ const Assistant = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Title Section */}
-        <div className="mb-8 animate-fade-in text-center">
+        {/* TITLE */}
+        <div className="mb-8 text-center">
           <div className="inline-flex items-center justify-center h-16 w-16 rounded-full gradient-primary mb-4">
             <Bot className="h-8 w-8 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-bold font-heading mb-2">
-            AI Research Assistant
-          </h1>
+          <h1 className="text-3xl font-bold mb-2">AI Research Assistant</h1>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            Get intelligent guidance for your R&D projects. Describe your
-            project idea and receive actionable insights, timelines, and
-            recommendations.
+            Get intelligent guidance for your R&D projects.
           </p>
         </div>
 
-        {/* Example Queries */}
-        <Card className="border-0 shadow-md mb-6 animate-slide-up">
+        {/* EXAMPLE QUERIES */}
+        <Card className="border-0 shadow-md mb-6">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Lightbulb className="h-4 w-4 text-yellow-500" />
@@ -113,194 +147,139 @@ const Assistant = () => {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {exampleQueries.map((example) => (
+              {exampleQueries.map((q) => (
                 <Button
-                  key={example}
+                  key={q}
                   variant="outline"
                   size="sm"
-                  onClick={() => handleExampleClick(example)}
-                  className="text-xs"
+                  onClick={() => handleExampleClick(q)}
                 >
-                  {example}
+                  {q}
                 </Button>
               ))}
             </div>
           </CardContent>
         </Card>
 
-        {/* Query Input */}
-        <Card
-          className="border-0 shadow-md mb-6 animate-slide-up"
-          style={{ animationDelay: "100ms" }}
-        >
+        {/* INPUT FORM */}
+        <Card className="border-0 shadow-md mb-6">
           <CardHeader>
-            <CardTitle className="font-heading">Ask Your Question</CardTitle>
+            <CardTitle>Ask Your Question</CardTitle>
             <CardDescription>
-              Describe your R&D project, research question, or technical
-              challenge
+              Describe your R&D project or technical challenge.
             </CardDescription>
           </CardHeader>
+
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <Textarea
-                placeholder="E.g., I want to build an autonomous drone for agricultural monitoring..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                placeholder="E.g., Build an EV prototype…"
                 rows={4}
                 disabled={loading}
-                className="resize-none"
               />
-              <Button
-                type="submit"
-                className="w-full gradient-primary"
-                disabled={loading || !query.trim()}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Send className="mr-2 h-4 w-4" />
-                    Get AI Guidance
-                  </>
-                )}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? <Loader2 className="animate-spin" /> : <Send />}
+                &nbsp; Get AI Guidance
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        {/* Response Section */}
-        {(analysis || loading) && (
-          <Card className="border-0 shadow-lg animate-scale-in">
+        {/* AI RESPONSE */}
+        {!loading && analysis.overview && (
+          <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="font-heading flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Bot className="h-5 w-5 text-primary" />
                 AI Response
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="space-y-3">
-                  <div className="h-4 bg-muted rounded animate-pulse w-full" />
-                  <div className="h-4 bg-muted rounded animate-pulse w-5/6" />
-                  <div className="h-4 bg-muted rounded animate-pulse w-4/6" />
-                  <div className="h-4 bg-muted rounded animate-pulse w-full" />
-                  <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
-                </div>
-              ) : (
-                analysis && (
-                  <div className="space-y-6 text-sm">
-                    {/* Overview */}
-                    <section>
-                      <h3 className="font-semibold mb-1">Overview</h3>
-                      <p className="text-muted-foreground">
-                        {analysis.overview}
-                      </p>
-                    </section>
 
-                    {/* Steps */}
-                    {analysis.steps?.length > 0 && (
-                      <section>
-                        <h3 className="font-semibold mb-1">Project Steps</h3>
-                        <ol className="list-decimal ml-5 space-y-1">
-                          {analysis.steps.map((step, idx) => (
-                            <li key={idx}>{step}</li>
-                          ))}
-                        </ol>
-                      </section>
-                    )}
+            <CardContent className="space-y-6 text-sm">
 
-                    {/* Tools */}
-                    {analysis.tools?.length > 0 && (
-                      <section>
-                        <h3 className="font-semibold mb-1">Tools & Technologies</h3>
-                        <ul className="list-disc ml-5 space-y-1">
-                          {analysis.tools.map((tool, idx) => (
-                            <li key={idx}>{tool}</li>
-                          ))}
-                        </ul>
-                      </section>
-                    )}
+              {/* Overview */}
+              <section>
+                <h3 className="font-semibold mb-1">Overview</h3>
+                <p>{analysis.overview}</p>
+              </section>
 
-                    {/* Timeline */}
-                    <section>
-                      <h3 className="font-semibold mb-1">Timeline</h3>
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <div className="border rounded-lg p-3">
-                          <p className="text-xs font-semibold uppercase text-muted-foreground">
-                            Design
-                          </p>
-                          <p className="text-sm mt-1">
-                            {analysis.timeline.design}
-                          </p>
-                        </div>
-
-                        <div className="border rounded-lg p-3">
-                          <p className="text-xs font-semibold uppercase text-muted-foreground">
-                            Implementation
-                          </p>
-                          <p className="text-sm mt-1">
-                            {analysis.timeline.implementation}
-                          </p>
-                        </div>
-
-                        <div className="border rounded-lg p-3">
-                          <p className="text-xs font-semibold uppercase text-muted-foreground">
-                            MVP
-                          </p>
-                          <p className="text-sm mt-1">{analysis.timeline.mvp}</p>
-                        </div>
-                      </div>
-                    </section>
-
-                    {/* Competitors */}
-                    {analysis.competitors?.length > 0 && (
-                      <section>
-                        <h3 className="font-semibold mb-1">
-                          Competitor Analysis
-                        </h3>
-                        <ul className="list-disc ml-5 space-y-1">
-                          {analysis.competitors.map((item, idx) => (
-                            <li key={idx}>{item}</li>
-                          ))}
-                        </ul>
-                      </section>
-                    )}
-
-                    {/* Risks */}
-                    {analysis.risks?.length > 0 && (
-                      <section>
-                        <h3 className="font-semibold mb-1">Risks</h3>
-                        <ul className="list-disc ml-5 space-y-1">
-                          {analysis.risks.map((risk, idx) => (
-                            <li key={idx}>{risk}</li>
-                          ))}
-                        </ul>
-                      </section>
-                    )}
-
-                    {/* Strategies */}
-                    {analysis.strategies?.length > 0 && (
-                      <section>
-                        <h3 className="font-semibold mb-1">Strategies</h3>
-                        <ul className="list-disc ml-5 space-y-1">
-                          {analysis.strategies.map((strategy, idx) => (
-                            <li key={idx}>{strategy}</li>
-                          ))}
-                        </ul>
-                      </section>
-                    )}
-
-                    {/* Summary */}
-                    <section>
-                      <h3 className="font-semibold mb-1">Summary</h3>
-                      <p className="text-muted-foreground">{analysis.summary}</p>
-                    </section>
-                  </div>
-                )
+              {/* Steps */}
+              {analysis.steps.length > 0 && (
+                <section>
+                  <h3 className="font-semibold mb-1">Steps</h3>
+                  <ol className="list-decimal ml-5">
+                    {analysis.steps.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ol>
+                </section>
               )}
+
+              {/* Tools */}
+              {analysis.tools.length > 0 && (
+                <section>
+                  <h3 className="font-semibold mb-1">Tools & Technologies</h3>
+                  <ul className="list-disc ml-5">
+                    {analysis.tools.map((t, i) => (
+                      <li key={i}>{t}</li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {/* Competitors */}
+              {analysis.competitors.length > 0 && (
+                <section>
+                  <h3 className="font-semibold mb-1">Competitor Analysis</h3>
+                  <ul className="list-disc ml-5">
+                    {analysis.competitors.map((c, i) => (
+                      <li key={i}>{c}</li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {/* Strategies */}
+              {analysis.strategies.length > 0 && (
+                <section>
+                  <h3 className="font-semibold mb-1">Strategies</h3>
+                  <ul className="list-disc ml-5">
+                    {analysis.strategies.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {/* Timeline */}
+              <section>
+                <h3 className="font-semibold mb-1">Timeline</h3>
+                <div className="grid md:grid-cols-3 gap-3">
+                  <div className="border p-3 rounded">
+                    <p className="text-xs text-muted-foreground">Design</p>
+                    <p>{analysis.timeline.design}</p>
+                  </div>
+
+                  <div className="border p-3 rounded">
+                    <p className="text-xs text-muted-foreground">Implementation</p>
+                    <p>{analysis.timeline.implementation}</p>
+                  </div>
+
+                  <div className="border p-3 rounded">
+                    <p className="text-xs text-muted-foreground">MVP</p>
+                    <p>{analysis.timeline.mvp}</p>
+                  </div>
+                </div>
+              </section>
+
+              {/* Summary */}
+              <section>
+                <h3 className="font-semibold mb-1">Summary</h3>
+                <p>{analysis.summary}</p>
+              </section>
+
             </CardContent>
           </Card>
         )}

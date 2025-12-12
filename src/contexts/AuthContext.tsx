@@ -1,13 +1,14 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { 
-  User, 
-  login as apiLogin, 
-  register as apiRegister, 
-  getMe, 
-  LoginData, 
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import {
+  User,
+  login as apiLogin,
+  register as apiRegister,
+  getMe,
+  LoginData,
   RegisterData,
-  deleteAccount as apiDeleteAccount
-} from '@/lib/api/auth';
+  deleteAccount as apiDeleteAccount,
+  refreshToken,
+} from "@/lib/api/auth";
 
 interface AuthContextType {
   user: User | null;
@@ -15,32 +16,32 @@ interface AuthContextType {
   login: (data: LoginData) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
-  deleteAccount: () => Promise<void>;   
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const clearAuth = useCallback(() => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
+  const clearAuth = () => {
+    localStorage.removeItem("access");
+    localStorage.removeItem("refresh");
     setUser(null);
-  }, []);
+  };
 
   const fetchUser = useCallback(async () => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
+    const access = localStorage.getItem("access");
+    const refresh = localStorage.getItem("refresh");
+
+    if (!access) {
       setLoading(false);
       return;
     }
@@ -48,13 +49,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const userData = await getMe();
       setUser(userData);
-    } catch (error) {
-      console.error('Failed to fetch user:', error);
-      clearAuth();
-    } finally {
-      setLoading(false);
+    } catch (error: any) {
+      console.warn("Access token expired, refreshing…");
+
+      if (refresh) {
+        try {
+          const newTokens = await refreshToken(refresh);
+          localStorage.setItem("access", newTokens.access);
+
+          const userData = await getMe();
+          setUser(userData);
+        } catch (e) {
+          console.error("Refresh token failed:", e);
+          clearAuth();
+        }
+      } else {
+        clearAuth();
+      }
     }
-  }, [clearAuth]);
+
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     fetchUser();
@@ -62,8 +77,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (data: LoginData) => {
     const tokens = await apiLogin(data);
-    localStorage.setItem('access_token', tokens.access);
-    localStorage.setItem('refresh_token', tokens.refresh);
+    localStorage.setItem("access", tokens.access);
+    localStorage.setItem("refresh", tokens.refresh);
 
     const userData = await getMe();
     setUser(userData);
@@ -74,11 +89,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await login({ username: data.username, password: data.password });
   };
 
-  const logout = () => {
-    clearAuth();
-  };
+  const logout = () => clearAuth();
 
-  //DELETE ACCOUNT FUNCTION
   const deleteAccount = async () => {
     try {
       await apiDeleteAccount();
@@ -90,15 +102,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
-        loading, 
-        login, 
-        register, 
-        logout, 
-        deleteAccount    
-      }}
+    <AuthContext.Provider
+      value={{ user, loading, login, register, logout, deleteAccount }}
     >
       {children}
     </AuthContext.Provider>
